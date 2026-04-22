@@ -260,7 +260,7 @@ export default async function AdminListPage({
             <thead>
               <tr
                 style={{
-                  background: "rgba(139,90,43,0.06)",
+                  background: "rgba(31,91,58,0.06)",
                   borderBottom: "2px solid var(--card-border)",
                   color: "var(--text-dim)",
                 }}

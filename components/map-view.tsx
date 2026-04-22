@@ -11,7 +11,7 @@ import {
 } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
-import { Company, Origin, TYPE_COLORS, TYPE_LABELS } from "@/data/types";
+import { Company, Origin, TYPE_COLORS, TYPE_LABELS, originShortLabel } from "@/data/types";
 import type { RouteStep } from "@/lib/route-types";
 import { formatDuration } from "@/lib/format";
 
@@ -53,6 +53,12 @@ interface MapViewProps {
   onSelectCompany: (id: string) => void;
   onShowInstructions?: (steps: RouteStep[], title: string) => void;
   onPickAlternative?: (id: string) => void;
+  /**
+   * Disparado quando o usuario clica no botao "Resetar visualizacao" do mapa.
+   * Use para limpar polylines (rotas fixas + custom), sele\u00e7\u00e3o, erros etc.
+   * O fly-to do mapa em si ja e feito pelo proprio controle.
+   */
+  onReset?: () => void;
 }
 
 function isMapReady(map: L.Map): boolean {
@@ -217,7 +223,7 @@ function CustomEndpoints({
           addPin(c.origin.lat, c.origin.lng, "#0f766e", c.origin.label, "A");
         }
         c.waypoints.forEach((w, i) => {
-          addPin(w.lat, w.lng, "#8b5a2b", w.label || `Parada ${i + 1}`, String(i + 1));
+          addPin(w.lat, w.lng, "#1f5b3a", w.label || `Parada ${i + 1}`, String(i + 1));
         });
         addPin(
           c.destination.lat,
@@ -251,9 +257,13 @@ function FitToSelected({ company }: { company: Company | null }) {
   return null;
 }
 
+interface HomeButtonOptions extends L.ControlOptions {
+  onResetRef?: { current: (() => void) | undefined };
+}
+
 const HomeButtonClass = L.Control.extend({
-  options: { position: "topleft" as L.ControlPosition },
-  onAdd: function (map: L.Map) {
+  options: { position: "topleft" as L.ControlPosition } as HomeButtonOptions,
+  onAdd: function (this: L.Control & { options: HomeButtonOptions }, map: L.Map) {
     const container = L.DomUtil.create("div", "leaflet-bar leaflet-control");
     const link = L.DomUtil.create(
       "a",
@@ -276,11 +286,14 @@ const HomeButtonClass = L.Control.extend({
     link.style.justifyContent = "center";
     link.style.width = "30px";
     link.style.height = "30px";
-    link.style.color = "var(--accent, #8B5A2B)";
+    link.style.color = "var(--accent, #1f5b3a)";
 
+    const onResetRef = this.options.onResetRef;
     L.DomEvent.on(link, "click", (e) => {
       L.DomEvent.preventDefault(e);
       L.DomEvent.stopPropagation(e);
+      // Limpa rotas/sele\u00e7\u00e3o no React (lido via ref pra pegar a callback atual)
+      onResetRef?.current?.();
       map.flyTo(DEFAULT_CENTER, DEFAULT_ZOOM, { duration: 0.6 });
     });
 
@@ -288,12 +301,15 @@ const HomeButtonClass = L.Control.extend({
   },
 });
 
-function HomeControl() {
+function HomeControl({ onReset }: { onReset?: () => void }) {
   const map = useMap();
+  // Ref atualizada a cada render mantem a callback "fresh" sem re-criar o controle.
+  const onResetRef = useRef<(() => void) | undefined>(onReset);
+  onResetRef.current = onReset;
 
   useEffect(() => {
     if (!isMapReady(map)) return;
-    const control = new HomeButtonClass();
+    const control = new HomeButtonClass({ onResetRef } as HomeButtonOptions);
     try {
       control.addTo(map);
     } catch {
@@ -339,6 +355,7 @@ export default function MapView({
   onSelectCompany,
   onShowInstructions,
   onPickAlternative,
+  onReset,
 }: MapViewProps) {
   const selected = companies.find((c) => c.id === selectedId) ?? null;
 
@@ -364,7 +381,7 @@ export default function MapView({
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
 
-        <HomeControl />
+        <HomeControl onReset={onReset} />
         <OriginMarkers origins={origins} />
         <CustomEndpoints customRoutes={customRoutes} />
         <FitToSelected company={selected} />
@@ -373,7 +390,7 @@ export default function MapView({
         {/* Rotas fixas (origens cadastradas, ativadas pelos chips do card) */}
         {routes.map((r) => {
           const o = originsById.get(r.originId);
-          const color = o?.color ?? "#8b5a2b";
+          const color = o?.color ?? "#1f5b3a";
           const originName = o?.name ?? r.originId;
           const tColor = trafficColor(r.durationMin, r.durationMinTraffic);
           const company = companies.find((c) => c.id === r.companyId);
@@ -410,7 +427,7 @@ export default function MapView({
         {/* Rotas custom (planejador) */}
         {customRoutes.map((c) => {
           const isAlt = !!c.isAlternative;
-          const color = isAlt ? "#6b7280" : "#8b5a2b";
+          const color = isAlt ? "#6b7280" : "#1f5b3a";
           const popupTitle = `${c.origin.label || "Origem"} → ${
             c.destination.label || "Destino"
           }`;
@@ -529,7 +546,7 @@ export default function MapView({
                     {origins.map((o) => (
                       <DistCell
                         key={o.id}
-                        label={o.short}
+                        label={originShortLabel(o)}
                         value={c.distancesByOrigin?.[o.id]}
                         color={o.color}
                       />

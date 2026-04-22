@@ -50,7 +50,12 @@ create table if not exists public.companies (
   site            text not null default '',
   contact         text not null default '',  -- legado: telefone "principal" antigo
   email           text not null default '',  -- legado: email "principal" antigo
-  address         text not null default '',
+  address         text not null default '',  -- legado: label completo (cache do Google Places)
+  -- Endereco estruturado (preenchido pelo autocomplete do Places).
+  street          text not null default '',
+  "number"        text not null default '',
+  neighborhood    text not null default '',
+  cep             text not null default '',
   dist_sapezal    integer not null default 0,
   dist_sorriso    integer not null default 0,
   dist_lem        integer not null default 0,
@@ -70,6 +75,15 @@ alter table public.companies
   add column if not exists priority company_priority not null default 'media';
 alter table public.companies
   add column if not exists last_contact_at timestamptz;
+-- Endereco estruturado (preenchido pelo autocomplete do Places).
+alter table public.companies
+  add column if not exists street text not null default '';
+alter table public.companies
+  add column if not exists "number" text not null default '';
+alter table public.companies
+  add column if not exists neighborhood text not null default '';
+alter table public.companies
+  add column if not exists cep text not null default '';
 
 create index if not exists companies_state_idx     on public.companies (state);
 create index if not exists companies_region_idx    on public.companies (region);
@@ -182,19 +196,40 @@ create trigger company_notes_refresh_last_contact
 -- 3 default seeds (Sapezal/Sorriso/LEM, is_default=true) + extras criadas pelo admin.
 -- A coluna "key" eh um slug estavel (usado em URLs e seeds); nao muda mesmo se renomearem.
 create table if not exists public.origins (
-  id          uuid primary key default gen_random_uuid(),
-  key         text not null unique,
-  name        text not null,
-  short       text not null,
-  color       text not null default '#8b5a2b',
-  address     text not null default '',
-  lat         double precision not null,
-  lng         double precision not null,
-  is_default  boolean not null default false,
-  sort_order  integer not null default 0,
-  created_at  timestamptz not null default now(),
-  updated_at  timestamptz not null default now()
+  id           uuid primary key default gen_random_uuid(),
+  key          text not null unique,
+  name         text not null,
+  short        text not null,
+  color        text not null default '#8b5a2b',
+  address      text not null default '',  -- legado: label completo (cache do Google Places)
+  -- Endereco estruturado (preenchido pelo autocomplete do Places).
+  street       text not null default '',
+  "number"     text not null default '',
+  neighborhood text not null default '',
+  cep          text not null default '',
+  city         text not null default '',
+  state        text not null default '',  -- UF de 2 letras (ex.: "MT", "BA")
+  lat          double precision not null,
+  lng          double precision not null,
+  is_default   boolean not null default false,
+  sort_order   integer not null default 0,
+  created_at   timestamptz not null default now(),
+  updated_at   timestamptz not null default now()
 );
+
+-- Idempotente para bancos preexistentes
+alter table public.origins
+  add column if not exists street text not null default '';
+alter table public.origins
+  add column if not exists "number" text not null default '';
+alter table public.origins
+  add column if not exists neighborhood text not null default '';
+alter table public.origins
+  add column if not exists cep text not null default '';
+alter table public.origins
+  add column if not exists city text not null default '';
+alter table public.origins
+  add column if not exists state text not null default '';
 
 create index if not exists origins_sort_idx on public.origins (sort_order, name);
 
@@ -204,15 +239,22 @@ create trigger origins_set_updated_at
   for each row execute function public.set_updated_at();
 
 -- Seed das 3 origens default. Idempotente via upsert por "key".
-insert into public.origins (key, name, short, color, lat, lng, is_default, sort_order)
+insert into public.origins
+  (key, name, short, color, city, state, address, lat, lng, is_default, sort_order)
 values
-  ('sapezal', 'SAPEZAL',                    'Sapezal',                  '#d97706', -13.55,    -58.765,  true, 10),
-  ('sorriso', 'SORRISO',                    'Sorriso',                  '#059669', -12.5432,  -55.7218, true, 20),
-  ('lem',     'LUÍS EDUARDO MAGALHÃES',     'Luís Eduardo Magalhães',   '#7c3aed', -12.0964,  -45.7897, true, 30)
+  ('sapezal', 'SAPEZAL',                'Sapezal',                '#d97706',
+   'Sapezal',                  'MT', 'Sapezal — MT',                  -13.55,    -58.765,  true, 10),
+  ('sorriso', 'SORRISO',                'Sorriso',                '#059669',
+   'Sorriso',                  'MT', 'Sorriso — MT',                  -12.5432,  -55.7218, true, 20),
+  ('lem',     'LUÍS EDUARDO MAGALHÃES', 'Luís Eduardo Magalhães', '#7c3aed',
+   'Luís Eduardo Magalhães',   'BA', 'Luís Eduardo Magalhães — BA',   -12.0964,  -45.7897, true, 30)
 on conflict (key) do update
   set name       = excluded.name,
       short      = excluded.short,
       color      = excluded.color,
+      city       = excluded.city,
+      state      = excluded.state,
+      address    = excluded.address,
       lat        = excluded.lat,
       lng        = excluded.lng,
       is_default = excluded.is_default,

@@ -37,6 +37,10 @@ export type CompanyRow = {
   contact: string;
   email: string;
   address: string;
+  street: string | null;
+  number: string | null;
+  neighborhood: string | null;
+  cep: string | null;
   published: boolean;
   status: CompanyStatus;
   priority: CompanyPriority;
@@ -53,7 +57,7 @@ export type AdminCompany = Company & {
 };
 
 const SELECT_COLUMNS =
-  'id,name,"group",city,state,region,lat,lng,type,description,products,capacity,bci,site,contact,email,address,published,status,priority,last_contact_at';
+  'id,name,"group",city,state,region,lat,lng,type,description,products,capacity,bci,site,contact,email,address,street,"number",neighborhood,cep,published,status,priority,last_contact_at';
 
 type RouteSlim = {
   company_id: string;
@@ -81,6 +85,10 @@ function rowToBase(row: CompanyRow): AdminCompany {
     contact: row.contact,
     email: row.email,
     address: row.address,
+    street: row.street ?? "",
+    number: row.number ?? "",
+    neighborhood: row.neighborhood ?? "",
+    cep: row.cep ?? "",
     distancesByOrigin: {},
     durationsByOrigin: {},
     published: row.published,
@@ -230,6 +238,10 @@ function companyToRow(
     contact: input.contact,
     email: input.email,
     address: input.address,
+    street: input.street ?? "",
+    number: input.number ?? "",
+    neighborhood: input.neighborhood ?? "",
+    cep: input.cep ?? "",
     published: input.published ?? true,
     status: input.status ?? "frio",
     priority: input.priority ?? "media",

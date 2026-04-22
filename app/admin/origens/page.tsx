@@ -3,6 +3,7 @@ import { Plus, RefreshCcw } from "lucide-react";
 import { requireAdmin } from "@/lib/admin-auth";
 import { isSupabaseConfigured } from "@/lib/companies";
 import { listOriginsAdmin } from "@/lib/origins";
+import { originShortLabel } from "@/data/types";
 import OriginRowActions from "@/components/origin-row-actions";
 
 export const dynamic = "force-dynamic";
@@ -66,7 +67,7 @@ export default async function AdminOrigensPage() {
           <thead>
             <tr
               style={{
-                background: "rgba(139,90,43,0.06)",
+                background: "rgba(31,91,58,0.06)",
                 borderBottom: "2px solid var(--card-border)",
                 color: "var(--text-dim)",
               }}
@@ -103,7 +104,7 @@ export default async function AdminOrigensPage() {
                     {o.name}
                   </div>
                   <div className="text-[10.5px]" style={{ color: "var(--text-light)" }}>
-                    {o.short}
+                    {originShortLabel(o)}
                   </div>
                 </td>
                 <td className="px-3 py-2.5 font-mono text-[11px]" style={{ color: "var(--text-dim)" }}>

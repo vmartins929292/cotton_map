@@ -93,15 +93,46 @@ export const KIND_ICONS: Record<InteractionKind, string> = {
   amostra: "📦",
 };
 
+/**
+ * Label curto da origem usado nos chips da main page no formato `cidade/UF`.
+ * Faz fallback para `short` (legacy) ou `name` quando city/state nao estao
+ * preenchidos (ex.: bancos antigos antes da migracao).
+ */
+export function originShortLabel(o: {
+  city?: string;
+  state?: string;
+  short?: string;
+  name?: string;
+}): string {
+  if (o.city && o.state) return `${o.city}/${o.state}`;
+  if (o.city) return o.city;
+  return o.short || o.name || "";
+}
+
 export interface Origin {
   /** UUID do banco; para os defaults ainda em codigo, usamos a propria key. */
   id: string;
   /** Slug estavel (ex.: "sapezal"). Default origins tem keys conhecidas. */
   key: string;
+  /** Nome formal/administrativo (ex.: "SAPEZAL"). Usado na tela admin. */
   name: string;
+  /**
+   * @deprecated UI passou a derivar `${city}/${state}` para o chip.
+   * Mantido por compatibilidade durante a migracao.
+   */
   short: string;
   color: string;
+  /** Endereco textual (cache do Google Places — usado em tooltips/PDF). */
   address: string;
+  // Endereco estruturado (preenchido pelo autocomplete do Places).
+  street?: string;
+  number?: string;
+  neighborhood?: string;
+  cep?: string;
+  /** Municipio (preenchido pelo autocomplete; obrigatorio na pratica). */
+  city?: string;
+  /** UF de 2 letras (ex.: "MT", "BA"). */
+  state?: string;
   lat: number;
   lng: number;
   isDefault: boolean;
@@ -125,7 +156,13 @@ export interface Company {
   site: string;
   contact: string;
   email: string;
+  /** Endereco textual (cache do Google Places — usado em tooltips/PDF). */
   address: string;
+  // Endereco estruturado (preenchido pelo autocomplete do Places).
+  street?: string;
+  number?: string;
+  neighborhood?: string;
+  cep?: string;
   /**
    * Distancias REAIS por origem, indexadas pelo Origin.id (ou key, no fallback estatico).
    * Calculadas e gravadas no momento do cadastro/edicao da empresa.
@@ -180,6 +217,12 @@ export const DEFAULT_ORIGINS: Origin[] = [
     short: "Sapezal",
     color: "#d97706",
     address: "Sapezal — MT",
+    street: "",
+    number: "",
+    neighborhood: "",
+    cep: "",
+    city: "Sapezal",
+    state: "MT",
     lat: -13.55,
     lng: -58.765,
     isDefault: true,
@@ -192,6 +235,12 @@ export const DEFAULT_ORIGINS: Origin[] = [
     short: "Sorriso",
     color: "#059669",
     address: "Sorriso — MT",
+    street: "",
+    number: "",
+    neighborhood: "",
+    cep: "",
+    city: "Sorriso",
+    state: "MT",
     lat: -12.5432,
     lng: -55.7218,
     isDefault: true,
@@ -204,6 +253,12 @@ export const DEFAULT_ORIGINS: Origin[] = [
     short: "Luís Eduardo Magalhães",
     color: "#7c3aed",
     address: "Luís Eduardo Magalhães — BA",
+    street: "",
+    number: "",
+    neighborhood: "",
+    cep: "",
+    city: "Luís Eduardo Magalhães",
+    state: "BA",
     lat: -12.0964,
     lng: -45.7897,
     isDefault: true,

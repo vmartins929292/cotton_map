@@ -20,6 +20,7 @@ import {
   Origin,
   TYPE_COLORS,
   TYPE_LABELS,
+  originShortLabel,
 } from "@/data/types";
 import { quickAddNoteAction, quickDeleteNoteAction } from "@/app/admin/notes-actions";
 
@@ -142,7 +143,7 @@ export default function CompanyDetailDialog({
           {origins.map((o) => (
             <DistCard
               key={o.id}
-              label={`km ${o.short}`}
+              label={`km ${originShortLabel(o)}`}
               value={c.distancesByOrigin?.[o.id]}
               color={o.color}
             />

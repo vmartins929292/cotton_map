@@ -21,7 +21,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
             style={{
               background: "var(--accent-dark)",
               color: "white",
-              boxShadow: "0 2px 8px rgba(139,90,43,0.25)",
+              boxShadow: "0 2px 8px rgba(31,91,58,0.25)",
             }}
           >
             <ArrowLeft className="w-4 h-4" />

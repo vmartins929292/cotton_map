@@ -2,7 +2,7 @@
 
 import { useId, useState } from "react";
 import { MapPin, Plus, Search, X } from "lucide-react";
-import { CompanyType, Origin, Region } from "@/data/types";
+import { CompanyType, Origin, Region, originShortLabel } from "@/data/types";
 import AddressAutocomplete, {
   type ResolvedAddress,
 } from "@/components/address-autocomplete";
@@ -11,6 +11,19 @@ const focusRing =
   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]/40 focus-visible:ring-offset-1 focus-visible:ring-offset-[var(--card)]";
 
 const CUSTOM_SORT_COLOR = "#0f766e"; // teal pra diferenciar dos defaults
+
+// Abreviações específicas usadas só no chip "Ordenar por distância" (espaço apertado).
+// O tooltip e o restante da UI continuam exibindo o nome completo via originShortLabel.
+const CHIP_LABEL_ABBREVIATIONS: Record<string, string> = {
+  "Luís Eduardo Magalhães/BA": "LEM/BA",
+  "Luis Eduardo Magalhães/BA": "LEM/BA",
+  "Luís Eduardo Magalhães": "LEM",
+  "Luis Eduardo Magalhães": "LEM",
+};
+
+function abbreviateChipLabel(label: string): string {
+  return CHIP_LABEL_ABBREVIATIONS[label] ?? label;
+}
 
 interface SidebarFiltersProps {
   origins: Origin[];
@@ -213,6 +226,8 @@ export default function SidebarFilters(props: SidebarFiltersProps) {
         >
           {props.origins.map((o) => {
             const active = props.sortOriginId === o.id;
+            const label = originShortLabel(o);
+            const chipLabel = abbreviateChipLabel(label);
             return (
               <button
                 key={o.id}
@@ -220,7 +235,7 @@ export default function SidebarFilters(props: SidebarFiltersProps) {
                 role="radio"
                 aria-checked={active}
                 onClick={() => props.onSortOriginChange(o.id)}
-                title={`Ordenar por distância de ${o.short}`}
+                title={`Ordenar por distância de ${label}`}
                 className={`flex-1 min-w-[80px] flex items-center justify-center gap-1 h-[22px] px-1.5 rounded text-[10px] font-semibold leading-none transition-colors cursor-pointer ${focusRing}`}
                 style={{
                   background: active ? "var(--card)" : "transparent",
@@ -234,7 +249,7 @@ export default function SidebarFilters(props: SidebarFiltersProps) {
                   style={{ background: o.color }}
                   aria-hidden
                 />
-                <span className="truncate">{o.short}</span>
+                <span className="truncate">{chipLabel}</span>
               </button>
             );
           })}

@@ -1,6 +1,6 @@
 "use client";
 
-import { Company, Origin, TYPE_COLORS, TYPE_LABELS } from "@/data/types";
+import { Company, Origin, TYPE_COLORS, TYPE_LABELS, originShortLabel } from "@/data/types";
 
 interface CompanyCardProps {
   company: Company;
@@ -38,7 +38,7 @@ export default function CompanyCard({
       style={{
         borderBottom: "1px solid var(--card-border)",
         borderLeft: `3px solid ${isSelected ? "var(--accent)" : "transparent"}`,
-        background: isSelected ? "rgba(139,90,43,0.06)" : "var(--bg-paper)",
+        background: isSelected ? "rgba(31,91,58,0.06)" : "var(--bg-paper)",
       }}
     >
       <div className="font-semibold text-[13px]" style={{ color: "var(--text)" }}>
@@ -104,7 +104,7 @@ function RouteToggle({
   onClick,
 }: RouteToggleProps) {
   const color = origin.color;
-  const municipality = origin.short;
+  const municipality = originShortLabel(origin);
 
   const showReal = realValue != null;
   const showFallback = !showReal && fallbackValue != null;

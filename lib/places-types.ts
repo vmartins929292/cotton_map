@@ -14,4 +14,12 @@ export type PlaceDetails = {
   lng: number;
   formattedAddress: string;
   displayName: string;
+  /** Componentes estruturados extraidos de addressComponents (best-effort). */
+  street: string;
+  number: string;
+  neighborhood: string;
+  cep: string;
+  city: string;
+  /** UF de 2 letras (ex.: "MT", "BA"). */
+  state: string;
 };

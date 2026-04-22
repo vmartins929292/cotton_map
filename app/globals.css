@@ -5,8 +5,9 @@
   --bg-paper: #fdfbf6;
   --card: #ffffff;
   --card-border: #e2dcd0;
-  --accent: #8B5A2B;
-  --accent-dark: #5c3a1a;
+  /* tema verde escuro (substituiu o marrom #8b5a2b / #5c3a1a) */
+  --accent: #1f5b3a;
+  --accent-dark: #0f3d24;
   --accent2: #1e6091;
   --text: #1a1f2e;
   --text-dim: #5c6370;

@@ -15,7 +15,7 @@ import {
   getCustomRouteAction,
   type CustomRouteResult,
 } from "@/app/actions/routes";
-import type { Company, Origin } from "@/data/types";
+import { originShortLabel, type Company, type Origin } from "@/data/types";
 import AddressAutocomplete, {
   type ResolvedAddress,
 } from "@/components/address-autocomplete";
@@ -179,7 +179,7 @@ export default function RoutePlanner({
       aria-hidden={!open}
     >
       <div className="px-4 py-2.5">
-        <div className="flex items-center gap-2 flex-wrap">
+        <div className="flex items-center gap-x-5 gap-y-2 flex-wrap">
           <div className="flex items-center gap-1.5 shrink-0">
             <Route
               className="w-3.5 h-3.5"
@@ -203,18 +203,20 @@ export default function RoutePlanner({
               onPickCustom={setOriginCustom}
             />
             {origin.kind === "custom" && (
-              <div className="w-[180px] shrink-0">
+              <div className="flex-1 min-w-[130px] max-w-[200px]">
                 {origin.addr ? (
                   <ResolvedOriginCard
                     addr={origin.addr}
                     onClear={() => setOrigin({ kind: "custom", addr: null })}
                   />
                 ) : (
+                  // Mesma moldura do destino vazio (dashed + bg semi-transparente)
+                  // pra origem e destino terem aparencia coerente quando ambos vazios.
                   <div
-                    className="h-8 rounded-md flex items-center"
+                    className="h-8 rounded-md flex items-center w-full overflow-hidden"
                     style={{
-                      background: "white",
-                      border: "1px solid var(--accent)",
+                      background: "rgba(255,255,255,0.5)",
+                      border: "1px dashed var(--card-border)",
                     }}
                   >
                     <AddressAutocomplete
@@ -222,6 +224,8 @@ export default function RoutePlanner({
                       initialLabel=""
                       autoFocus
                       compact
+                      icon="pin"
+                      chrome="borderless"
                       onResolved={(addr) =>
                         setOrigin({ kind: "custom", addr })
                       }
@@ -292,23 +296,22 @@ export default function RoutePlanner({
               </div>
             ) : (
               <div
-                className="h-8 px-2.5 rounded-md text-[11.5px] flex items-center gap-2 w-full"
+                className="h-8 px-2.5 rounded-md text-[12px] flex items-center gap-2 w-full"
                 style={{
                   background: "rgba(255,255,255,0.5)",
                   border: "1px dashed var(--card-border)",
                   color: "var(--text-light)",
                 }}
                 aria-labelledby={destLabelId}
+                title="Clique numa empresa na lista para definir o destino"
               >
                 <MapPin className="w-3.5 h-3.5 shrink-0" aria-hidden />
-                <span className="truncate">
-                  Clique numa empresa na lista para definir o destino…
-                </span>
+                <span className="truncate">Selecione uma empresa…</span>
               </div>
             )}
           </FieldRow>
 
-          <div className="flex items-center gap-1.5 shrink-0">
+          <div className="flex items-center gap-2 shrink-0">
             <button
               type="button"
               onClick={addWaypoint}
@@ -336,7 +339,7 @@ export default function RoutePlanner({
             </button>
 
             <span
-              className="w-px h-5 shrink-0"
+              className="w-px h-5 shrink-0 mx-1"
               style={{ background: "var(--card-border)" }}
               aria-hidden
             />
@@ -500,7 +503,7 @@ function FieldRow({
 }) {
   return (
     <div
-      className={`flex items-center gap-1.5 ${grow ? "flex-1 min-w-[160px] max-w-[280px]" : ""}`}
+      className={`flex items-center gap-1.5 ${grow ? "flex-1 min-w-[220px] max-w-[380px]" : ""}`}
     >
       <span
         id={labelId}
@@ -530,7 +533,7 @@ function OriginSegmented({
   const isCustom = origin.kind === "custom";
   return (
     <div
-      className="inline-flex items-center h-8 p-0.5 rounded-md shrink-0 flex-wrap"
+      className="inline-flex items-stretch h-8 p-0.5 rounded-md shrink-0 gap-0.5"
       style={{
         background: "white",
         border: "1px solid var(--card-border)",
@@ -540,6 +543,7 @@ function OriginSegmented({
     >
       {origins.map((o) => {
         const active = origin.kind === "fixed" && origin.id === o.id;
+        const label = originShortLabel(o);
         return (
           <button
             key={o.id}
@@ -547,14 +551,14 @@ function OriginSegmented({
             role="radio"
             aria-checked={active}
             onClick={() => onPickFixed(o.id)}
-            title={o.short}
-            className={`h-7 px-2 rounded text-[11px] font-semibold leading-none transition cursor-pointer ${focusRing}`}
+            title={label}
+            className={`inline-flex items-center justify-center px-2.5 rounded text-[11px] font-semibold leading-none transition cursor-pointer ${focusRing}`}
             style={{
               background: active ? o.color : "transparent",
               color: active ? "white" : "var(--text-dim)",
             }}
           >
-            {o.short}
+            {label}
           </button>
         );
       })}
@@ -567,7 +571,7 @@ function OriginSegmented({
         title={
           isCustom ? "Voltar para origem fixa" : "Usar um endereço personalizado"
         }
-        className={`h-7 px-2 rounded text-[11px] font-semibold leading-none transition cursor-pointer flex items-center gap-1 ${focusRing}`}
+        className={`inline-flex items-center justify-center gap-1 px-2.5 rounded text-[11px] font-semibold leading-none transition cursor-pointer ${focusRing}`}
         style={{
           background: isCustom ? "var(--accent)" : "transparent",
           color: isCustom ? "white" : "var(--text-dim)",

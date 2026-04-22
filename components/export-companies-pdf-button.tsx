@@ -49,7 +49,7 @@ export default function ExportCompaniesPdfButton({ companies, filters }: Props) 
 
       doc.setFont("helvetica", "bold");
       doc.setFontSize(14);
-      doc.setTextColor(60, 41, 25);
+      doc.setTextColor(15, 61, 36);
       doc.text("VALOR AG — Compradores de Algodão", 40, 40);
 
       doc.setFont("helvetica", "normal");
@@ -67,7 +67,7 @@ export default function ExportCompaniesPdfButton({ companies, filters }: Props) 
           : "Sem filtros aplicados (lista completa).";
       doc.text(filterLine, 40, 70);
 
-      doc.setTextColor(60, 41, 25);
+      doc.setTextColor(15, 61, 36);
       doc.setFont("helvetica", "bold");
       doc.text(
         `${companies.length} ${companies.length === 1 ? "empresa" : "empresas"}`,
@@ -121,7 +121,7 @@ export default function ExportCompaniesPdfButton({ companies, filters }: Props) 
           lineWidth: 0.3,
         },
         headStyles: {
-          fillColor: [139, 90, 43],
+          fillColor: [31, 91, 58],
           textColor: [255, 255, 255],
           fontStyle: "bold",
           fontSize: 8,

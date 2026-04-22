@@ -26,11 +26,18 @@ import {
   TYPE_COLORS,
   TYPE_LABELS,
   STATE_NAMES,
+  originShortLabel,
 } from "@/data/types";
 import { matchesSearch } from "@/lib/search";
 
 type ViewMode = "states" | "table";
-type SortKey = "name" | "state" | "type" | "capacity" | { kind: "origin"; id: string };
+type SortKey =
+  | "name"
+  | "city"
+  | "state"
+  | "type"
+  | "capacity"
+  | { kind: "origin"; id: string };
 
 function sortKeyEquals(a: SortKey, b: SortKey): boolean {
   if (typeof a === "string" || typeof b === "string") return a === b;
@@ -72,6 +79,11 @@ export default function EmpresasClient({
         switch (sortKey) {
           case "name":
             cmp = a.name.localeCompare(b.name);
+            break;
+          case "city":
+            cmp =
+              a.city.localeCompare(b.city) ||
+              a.state.localeCompare(b.state);
             break;
           case "state":
             cmp =
@@ -137,7 +149,7 @@ export default function EmpresasClient({
       "Site",
       "Produtos",
       "Capacidade",
-      ...origins.map((o) => `km ${o.short}`),
+      ...origins.map((o) => `km ${originShortLabel(o)}`),
     ];
     const rows = filtered.map((c) => [
       c.name,
@@ -343,7 +355,7 @@ export default function EmpresasClient({
                   <span
                     className="text-[11px] font-semibold px-2.5 py-0.5 rounded-full"
                     style={{
-                      background: "rgba(139,90,43,0.1)",
+                      background: "rgba(31,91,58,0.1)",
                       color: "var(--accent-dark)",
                     }}
                   >
@@ -376,12 +388,12 @@ export default function EmpresasClient({
             <div className="overflow-x-auto">
               <table
                 className="w-full text-left"
-                style={{ minWidth: 1200 + origins.length * 130 }}
+                style={{ minWidth: 1290 }}
               >
                 <thead>
                   <tr
                     style={{
-                      background: "rgba(139,90,43,0.06)",
+                      background: "rgba(31,91,58,0.06)",
                       borderBottom: "2px solid var(--card-border)",
                     }}
                   >
@@ -403,12 +415,20 @@ export default function EmpresasClient({
                       width={110}
                     />
                     <SortHeader
-                      label="Cidade / UF"
+                      label="Cidade"
+                      sortKey="city"
+                      current={sortKey}
+                      asc={sortAsc}
+                      onSort={handleSort}
+                      width={140}
+                    />
+                    <SortHeader
+                      label="Estado"
                       sortKey="state"
                       current={sortKey}
                       asc={sortAsc}
                       onSort={handleSort}
-                      width={160}
+                      width={140}
                     />
                     <SortHeader label="Endereço" width={260} />
                     <SortHeader label="Telefone" width={120} />
@@ -422,29 +442,11 @@ export default function EmpresasClient({
                       onSort={handleSort}
                       width={130}
                     />
-                    <SortHeader label="BCI" width={45} />
-                    {origins.map((o) => (
-                      <SortHeader
-                        key={o.id}
-                        label={o.short}
-                        sortKey={{ kind: "origin", id: o.id }}
-                        current={sortKey}
-                        asc={sortAsc}
-                        onSort={handleSort}
-                        width={130}
-                        preserveLabelCase
-                      />
-                    ))}
                   </tr>
                 </thead>
                 <tbody>
                   {sortedTable.map((c, i) => (
-                    <TableRow
-                      key={c.id}
-                      company={c}
-                      origins={origins}
-                      index={i}
-                    />
+                    <TableRow key={c.id} company={c} index={i} />
                   ))}
                 </tbody>
               </table>
@@ -510,11 +512,9 @@ function SortHeader({
 
 function TableRow({
   company: c,
-  origins,
   index,
 }: {
   company: Company;
-  origins: Origin[];
   index: number;
 }) {
   const typeColor = TYPE_COLORS[c.type];
@@ -557,8 +557,19 @@ function TableRow({
         <div className="text-[11px] font-medium" style={{ color: "var(--text)" }}>
           {c.city}
         </div>
-        <div className="text-[10px]" style={{ color: "var(--text-dim)" }}>
-          {c.state} — {STATE_NAMES[c.state] ?? c.state}
+      </td>
+      <td className="px-3 py-2.5">
+        <div
+          className="text-[11px] font-semibold inline-flex items-center justify-center w-7 h-5 rounded"
+          style={{
+            background: "rgba(31,91,58,0.08)",
+            color: "var(--accent-dark)",
+          }}
+        >
+          {c.state}
+        </div>
+        <div className="text-[10px] mt-0.5" style={{ color: "var(--text-dim)" }}>
+          {STATE_NAMES[c.state] ?? c.state}
         </div>
       </td>
       <td className="px-3 py-2.5 text-[10px]" style={{ color: "var(--text-dim)" }}>
@@ -615,29 +626,6 @@ function TableRow({
       >
         {c.capacity}
       </td>
-      <td className="px-3 py-2.5 text-center">
-        {c.bci ? (
-          <span className="text-[9px] font-bold" style={{ color: "var(--green)" }}>
-            ✓
-          </span>
-        ) : (
-          <span className="text-[9px]" style={{ color: "var(--text-light)" }}>
-            —
-          </span>
-        )}
-      </td>
-      {origins.map((o) => {
-        const v = c.distancesByOrigin?.[o.id];
-        return (
-          <td
-            key={o.id}
-            className="px-3 py-2.5 text-[10px] font-bold text-center"
-            style={{ color: o.color }}
-          >
-            {v != null ? v.toLocaleString("pt-BR") : "—"}
-          </td>
-        );
-      })}
     </tr>
   );
 }
@@ -697,7 +685,9 @@ function CompanyRow({
           <div className="mt-2 space-y-1">
             <ContactRow
               icon={<MapPin className="w-3.5 h-3.5" />}
-              value={`${c.city} — ${c.state}`}
+              value={`${c.city} · ${c.state}${
+                STATE_NAMES[c.state] ? ` — ${STATE_NAMES[c.state]}` : ""
+              }`}
             />
             {c.address && (
               <ContactRow
@@ -751,7 +741,7 @@ function CompanyRow({
             {origins.map((o) => (
               <DistBadge
                 key={o.id}
-                label={o.short}
+                label={originShortLabel(o)}
                 value={c.distancesByOrigin?.[o.id]}
                 color={o.color}
               />

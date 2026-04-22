@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { saveCompanyAction } from "@/app/admin/actions";
 import type { SaveState } from "@/app/admin/types";
@@ -12,6 +12,9 @@ import {
   PRIORITY_LABELS,
 } from "@/data/types";
 import type { AdminCompany } from "@/lib/companies";
+import AddressAutocomplete, {
+  type ResolvedAddress,
+} from "@/components/address-autocomplete";
 
 const initial: SaveState = {};
 
@@ -20,6 +23,24 @@ const REGION_OPTIONS = Object.entries(REGION_LABELS) as Array<[string, string]>;
 const STATE_OPTIONS = Object.entries(STATE_NAMES).sort((a, b) => a[0].localeCompare(b[0]));
 const STATUS_OPTIONS = Object.entries(STATUS_LABELS) as Array<[string, string]>;
 const PRIORITY_OPTIONS = Object.entries(PRIORITY_LABELS) as Array<[string, string]>;
+
+type AddrFields = {
+  cep: string;
+  street: string;
+  number: string;
+  neighborhood: string;
+  city: string;
+  state: string;
+};
+
+function buildLabel(f: AddrFields): string {
+  const parts: string[] = [];
+  if (f.street) parts.push(f.street + (f.number ? `, ${f.number}` : ""));
+  if (f.neighborhood) parts.push(f.neighborhood);
+  if (f.city) parts.push(f.city + (f.state ? `/${f.state}` : ""));
+  if (f.cep) parts.push(`CEP ${f.cep}`);
+  return parts.join(" — ");
+}
 
 export default function CompanyForm({
   mode,
@@ -32,12 +53,54 @@ export default function CompanyForm({
   const action = saveCompanyAction.bind(null, mode, initialData?.id ?? null);
   const [state, formAction, pending] = useActionState(action, initial);
 
+  const initialFields = useMemo<AddrFields>(
+    () => ({
+      cep: initialData?.cep ?? "",
+      street: initialData?.street ?? "",
+      number: initialData?.number ?? "",
+      neighborhood: initialData?.neighborhood ?? "",
+      city: initialData?.city ?? "",
+      state: initialData?.state ?? "SP",
+    }),
+    [initialData]
+  );
+
+  const [fields, setFields] = useState<AddrFields>(initialFields);
+  const [resolved, setResolved] = useState<ResolvedAddress | null>(null);
+
   const initialAddress = initialData?.address ?? "";
-  const [address, setAddress] = useState(initialAddress);
-  const addressUnchanged =
+  // Se o admin nao mexeu nos campos e nao escolheu novo endereco, podemos
+  // reaproveitar lat/lng e evitar o geocode no submit.
+  const fieldsUnchanged =
     initialData?.lat != null &&
     initialData?.lng != null &&
-    address.trim() === initialAddress.trim();
+    !resolved &&
+    fields.cep === initialFields.cep &&
+    fields.street === initialFields.street &&
+    fields.number === initialFields.number &&
+    fields.neighborhood === initialFields.neighborhood &&
+    fields.city === initialFields.city &&
+    fields.state === initialFields.state;
+
+  function setField<K extends keyof AddrFields>(key: K, value: AddrFields[K]) {
+    setFields((f) => ({ ...f, [key]: value }));
+  }
+
+  function handleResolved(addr: ResolvedAddress | null) {
+    setResolved(addr);
+    if (addr) {
+      setFields({
+        cep: addr.cep,
+        street: addr.street,
+        number: addr.number,
+        neighborhood: addr.neighborhood,
+        city: addr.city,
+        state: addr.state || fields.state,
+      });
+    }
+  }
+
+  const addressLabel = resolved?.label ?? (fieldsUnchanged ? initialAddress : buildLabel(fields));
 
   return (
     <form action={formAction} className="space-y-4">
@@ -68,17 +131,6 @@ export default function CompanyForm({
           </select>
         </Field>
 
-        <Field label="Cidade *" required>
-          <input name="city" required defaultValue={initialData?.city ?? ""} className={inputCls} />
-        </Field>
-        <Field label="Estado (UF) *" required>
-          <select name="state" required defaultValue={initialData?.state ?? "SP"} className={inputCls}>
-            {STATE_OPTIONS.map(([uf, nome]) => (
-              <option key={uf} value={uf}>{uf} — {nome}</option>
-            ))}
-          </select>
-        </Field>
-
         <Field label="Região *" required>
           <select name="region" required defaultValue={initialData?.region ?? "SE"} className={inputCls}>
             {REGION_OPTIONS.map(([k, v]) => (
@@ -91,26 +143,97 @@ export default function CompanyForm({
         </Field>
       </div>
 
-      <Field label="Endereço *" required>
-        <input
-          name="address"
-          required
-          value={address}
-          onChange={(e) => setAddress(e.target.value)}
-          className={inputCls}
-          placeholder="Rua, nº, bairro, cidade/UF, CEP — usado para localizar a empresa no mapa via Google Maps"
-        />
-        <p className="text-[10.5px] mt-1" style={{ color: "var(--text-light)" }}>
-          {addressUnchanged
-            ? "Endereço inalterado: lat/lng e distâncias já estão calculadas."
-            : "A latitude/longitude e distâncias para Sapezal/Sorriso/LEM serão calculadas automaticamente via Google Maps ao salvar."}
-        </p>
-      </Field>
+      <div
+        className="rounded-lg p-3 space-y-3"
+        style={{ background: "var(--bg)", border: "1px solid var(--card-border)" }}
+      >
+        <Field label="Buscar endereço (auto-preenche os campos abaixo)">
+          <AddressAutocomplete
+            placeholder="Endereço completo da empresa (rua, cidade/UF, CEP)"
+            initialLabel={initialAddress}
+            onResolved={handleResolved}
+          />
+          <p className="text-[10.5px] mt-1" style={{ color: "var(--text-light)" }}>
+            {fieldsUnchanged
+              ? "Endereço inalterado: lat/lng e distâncias já estão calculadas."
+              : "A latitude/longitude e distâncias para Sapezal/Sorriso/LEM serão calculadas automaticamente via Google Maps ao salvar."}
+          </p>
+        </Field>
 
-      {addressUnchanged && (
+        <div className="grid grid-cols-3 gap-3 max-md:grid-cols-1">
+          <Field label="CEP">
+            <input
+              name="cep"
+              value={fields.cep}
+              onChange={(e) => setField("cep", e.target.value)}
+              placeholder="00000-000"
+              className={inputCls}
+            />
+          </Field>
+          <Field label="Rua">
+            <input
+              name="street"
+              value={fields.street}
+              onChange={(e) => setField("street", e.target.value)}
+              className={inputCls}
+            />
+          </Field>
+          <Field label="Número">
+            <input
+              name="number"
+              value={fields.number}
+              onChange={(e) => setField("number", e.target.value)}
+              className={inputCls}
+            />
+          </Field>
+        </div>
+
+        <div className="grid grid-cols-3 gap-3 max-md:grid-cols-1">
+          <Field label="Bairro">
+            <input
+              name="neighborhood"
+              value={fields.neighborhood}
+              onChange={(e) => setField("neighborhood", e.target.value)}
+              className={inputCls}
+            />
+          </Field>
+          <Field label="Cidade *" required>
+            <input
+              name="city"
+              required
+              value={fields.city}
+              onChange={(e) => setField("city", e.target.value)}
+              className={inputCls}
+            />
+          </Field>
+          <Field label="Estado (UF) *" required>
+            <select
+              name="state"
+              required
+              value={fields.state}
+              onChange={(e) => setField("state", e.target.value)}
+              className={inputCls}
+            >
+              {STATE_OPTIONS.map(([uf, nome]) => (
+                <option key={uf} value={uf}>{uf} — {nome}</option>
+              ))}
+            </select>
+          </Field>
+        </div>
+      </div>
+
+      {/* Campos derivados enviados no POST */}
+      <input type="hidden" name="address" value={addressLabel} />
+      {fieldsUnchanged && (
         <>
           <input type="hidden" name="lat" value={initialData!.lat} />
           <input type="hidden" name="lng" value={initialData!.lng} />
+        </>
+      )}
+      {!fieldsUnchanged && resolved && (
+        <>
+          <input type="hidden" name="lat" value={resolved.lat} />
+          <input type="hidden" name="lng" value={resolved.lng} />
         </>
       )}
 

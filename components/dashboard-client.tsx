@@ -18,6 +18,7 @@ import {
   Region,
   TYPE_COLORS,
   TYPE_LABELS,
+  originShortLabel,
 } from "@/data/types";
 import type { RouteStep } from "@/lib/route-types";
 import { matchesSearch } from "@/lib/search";
@@ -480,7 +481,7 @@ export default function DashboardClient({
             className="w-7 h-7 rounded-full flex items-center justify-center text-white font-bold text-sm cursor-pointer transition-transform hover:scale-110"
             style={{
               background: "var(--accent)",
-              boxShadow: "0 2px 8px rgba(139,90,43,0.3)",
+              boxShadow: "0 2px 8px rgba(31,91,58,0.3)",
             }}
           >
             ?
@@ -574,6 +575,16 @@ export default function DashboardClient({
             onSelectCompany={handleSelectCompany}
             onShowInstructions={openInstructions}
             onPickAlternative={onPickAlternative}
+            onReset={() => {
+              // Limpa rotas tra\u00e7adas (chips do card + rota custom do planejador)
+              // e qualquer estado visual associado. O fly-to do mapa em si e feito
+              // pelo proprio controle dentro do MapView.
+              setActiveRoutes(new Map());
+              setCustomRoute(null);
+              setActiveAlternativeIdx(null);
+              setRouteError(null);
+              setSelectedId(null);
+            }}
           />
 
           {routeError && (
@@ -625,7 +636,7 @@ export default function DashboardClient({
               style={{ borderTop: "1px solid var(--card-border)" }}
             >
               {origins.map((o) => (
-                <OriginLegend key={o.id} color={o.color} label={o.short} />
+                <OriginLegend key={o.id} color={o.color} label={originShortLabel(o)} />
               ))}
             </div>
           </div>

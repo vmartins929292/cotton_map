@@ -8,13 +8,58 @@ const RATE_LIMIT = Number(
   process.env.GOOGLE_PLACES_RATE_LIMIT_PER_MIN ?? 30
 );
 
+type GoogleAddressComponent = {
+  longText?: string;
+  shortText?: string;
+  types?: string[];
+};
+
 type GoogleResp = {
   id?: string;
   location?: { latitude: number; longitude: number };
   formattedAddress?: string;
   displayName?: { text?: string };
+  addressComponents?: GoogleAddressComponent[];
   error?: { message?: string; status?: string };
 };
+
+/**
+ * Extrai os componentes de endereco em formato estruturado (rua, numero, bairro,
+ * CEP, cidade, UF). A Google nem sempre devolve todos (ex.: cidades pequenas sem
+ * `street_number` ou `postal_code`); nesses casos, retornamos string vazia.
+ */
+function extractAddressParts(components: GoogleAddressComponent[] | undefined) {
+  const parts = {
+    street: "",
+    number: "",
+    neighborhood: "",
+    cep: "",
+    city: "",
+    state: "",
+  };
+  if (!components || components.length === 0) return parts;
+
+  function pick(types: string[], opts: { short?: boolean } = {}): string {
+    for (const c of components!) {
+      if (!c.types) continue;
+      if (types.some((t) => c.types!.includes(t))) {
+        return (opts.short ? c.shortText : c.longText) ?? c.longText ?? "";
+      }
+    }
+    return "";
+  }
+
+  parts.street = pick(["route"]);
+  parts.number = pick(["street_number"]);
+  parts.neighborhood = pick(["sublocality_level_1", "sublocality", "neighborhood"]);
+  parts.cep = pick(["postal_code"]);
+  // Em municipios brasileiros, "locality" costuma ser a cidade; quando ausente,
+  // caimos em administrative_area_level_2.
+  parts.city = pick(["locality", "administrative_area_level_2"]);
+  parts.state = pick(["administrative_area_level_1"], { short: true });
+
+  return parts;
+}
 
 export async function GET(req: Request) {
   const apiKey = process.env.GOOGLE_MAPS_API_KEY;
@@ -55,7 +100,8 @@ export async function GET(req: Request) {
       method: "GET",
       headers: {
         "X-Goog-Api-Key": apiKey,
-        "X-Goog-FieldMask": "id,location,formattedAddress,displayName",
+        "X-Goog-FieldMask":
+          "id,location,formattedAddress,displayName,addressComponents",
       },
       cache: "no-store",
     });
@@ -85,12 +131,14 @@ export async function GET(req: Request) {
     );
   }
 
+  const parts = extractAddressParts(data.addressComponents);
   const details: PlaceDetails = {
     placeId: data.id ?? placeId,
     lat: data.location.latitude,
     lng: data.location.longitude,
     formattedAddress: data.formattedAddress ?? "",
     displayName: data.displayName?.text ?? data.formattedAddress ?? "",
+    ...parts,
   };
 
   return NextResponse.json(details);

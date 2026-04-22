@@ -13,6 +13,12 @@ export type OriginRow = {
   short: string;
   color: string;
   address: string;
+  street: string | null;
+  number: string | null;
+  neighborhood: string | null;
+  cep: string | null;
+  city: string | null;
+  state: string | null;
   lat: number;
   lng: number;
   is_default: boolean;
@@ -20,7 +26,7 @@ export type OriginRow = {
 };
 
 const SELECT_COLUMNS =
-  "id,key,name,short,color,address,lat,lng,is_default,sort_order";
+  'id,key,name,short,color,address,street,"number",neighborhood,cep,city,state,lat,lng,is_default,sort_order';
 
 function rowToOrigin(row: OriginRow): Origin {
   return {
@@ -30,6 +36,12 @@ function rowToOrigin(row: OriginRow): Origin {
     short: row.short,
     color: row.color,
     address: row.address ?? "",
+    street: row.street ?? "",
+    number: row.number ?? "",
+    neighborhood: row.neighborhood ?? "",
+    cep: row.cep ?? "",
+    city: row.city ?? "",
+    state: row.state ?? "",
     lat: row.lat,
     lng: row.lng,
     isDefault: row.is_default,
@@ -105,6 +117,12 @@ export async function createOrigin(input: {
   short: string;
   color: string;
   address: string;
+  street?: string;
+  number?: string;
+  neighborhood?: string;
+  cep?: string;
+  city?: string;
+  state?: string;
   lat: number;
   lng: number;
   sortOrder: number;
@@ -118,6 +136,12 @@ export async function createOrigin(input: {
       short: input.short,
       color: input.color,
       address: input.address,
+      street: input.street ?? "",
+      number: input.number ?? "",
+      neighborhood: input.neighborhood ?? "",
+      cep: input.cep ?? "",
+      city: input.city ?? "",
+      state: input.state ?? "",
       lat: input.lat,
       lng: input.lng,
       is_default: false,
@@ -136,6 +160,12 @@ export async function updateOrigin(
     short: string;
     color: string;
     address: string;
+    street: string;
+    number: string;
+    neighborhood: string;
+    cep: string;
+    city: string;
+    state: string;
     lat: number;
     lng: number;
     sortOrder: number;
@@ -147,6 +177,12 @@ export async function updateOrigin(
   if (patch.short !== undefined) update.short = patch.short;
   if (patch.color !== undefined) update.color = patch.color;
   if (patch.address !== undefined) update.address = patch.address;
+  if (patch.street !== undefined) update.street = patch.street;
+  if (patch.number !== undefined) update.number = patch.number;
+  if (patch.neighborhood !== undefined) update.neighborhood = patch.neighborhood;
+  if (patch.cep !== undefined) update.cep = patch.cep;
+  if (patch.city !== undefined) update.city = patch.city;
+  if (patch.state !== undefined) update.state = patch.state;
   if (patch.lat !== undefined) update.lat = patch.lat;
   if (patch.lng !== undefined) update.lng = patch.lng;
   if (patch.sortOrder !== undefined) update.sort_order = patch.sortOrder;

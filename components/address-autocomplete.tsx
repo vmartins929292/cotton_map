@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useId, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { Loader2, MapPin, Search, X } from "lucide-react";
 import type { PlaceSuggestion, PlaceDetails } from "@/lib/places-types";
 
@@ -9,6 +10,14 @@ export type ResolvedAddress = {
   lng: number;
   label: string;
   placeId: string;
+  /** Componentes estruturados extraidos do Google Places (best-effort). */
+  street: string;
+  number: string;
+  neighborhood: string;
+  cep: string;
+  city: string;
+  /** UF de 2 letras (ex.: "MT", "BA"). */
+  state: string;
 };
 
 interface Props {
@@ -17,6 +26,14 @@ interface Props {
   onResolved: (addr: ResolvedAddress | null) => void;
   autoFocus?: boolean;
   compact?: boolean;
+  /** Icone exibido a esquerda do input. Default: "search". */
+  icon?: "search" | "pin";
+  /**
+   * Aparencia do input. "default" = bg + borda proprias.
+   * "borderless" = bg/borda transparentes, herda do wrapper externo
+   * (use quando quiser controlar a moldura por fora pra alinhar com outros campos).
+   */
+  chrome?: "default" | "borderless";
 }
 
 function uuid(): string {
@@ -33,6 +50,8 @@ export default function AddressAutocomplete({
   onResolved,
   autoFocus = false,
   compact = false,
+  icon = "search",
+  chrome = "default",
 }: Props) {
   const [query, setQuery] = useState(initialLabel);
   const [suggestions, setSuggestions] = useState<PlaceSuggestion[]>([]);
@@ -45,18 +64,61 @@ export default function AddressAutocomplete({
   const sessionToken = useMemo(uuid, []);
   const listId = useId();
   const wrapRef = useRef<HTMLDivElement | null>(null);
+  const inputWrapRef = useRef<HTMLDivElement | null>(null);
+  const popoverRef = useRef<HTMLUListElement | null>(null);
   const debounceRef = useRef<number | null>(null);
   const abortRef = useRef<AbortController | null>(null);
+  const [mounted, setMounted] = useState(false);
+  const [popoverRect, setPopoverRect] = useState<{
+    top: number;
+    left: number;
+    width: number;
+  } | null>(null);
 
-  // Click fora fecha popover
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  // Click fora fecha popover (considerando o portal)
   useEffect(() => {
     function onDocClick(e: MouseEvent) {
-      if (!wrapRef.current) return;
-      if (!wrapRef.current.contains(e.target as Node)) setOpen(false);
+      const target = e.target as Node;
+      const inWrap = wrapRef.current?.contains(target);
+      const inPopover = popoverRef.current?.contains(target);
+      if (!inWrap && !inPopover) setOpen(false);
     }
     document.addEventListener("mousedown", onDocClick);
     return () => document.removeEventListener("mousedown", onDocClick);
   }, []);
+
+  const updatePopoverRect = useCallback(() => {
+    const el = inputWrapRef.current;
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    setPopoverRect({
+      top: r.bottom + 4,
+      left: r.left,
+      width: r.width,
+    });
+  }, []);
+
+  useLayoutEffect(() => {
+    if (!open) return;
+    updatePopoverRect();
+  }, [open, suggestions.length, updatePopoverRect]);
+
+  useEffect(() => {
+    if (!open) return;
+    function onScrollOrResize() {
+      updatePopoverRect();
+    }
+    window.addEventListener("scroll", onScrollOrResize, true);
+    window.addEventListener("resize", onScrollOrResize);
+    return () => {
+      window.removeEventListener("scroll", onScrollOrResize, true);
+      window.removeEventListener("resize", onScrollOrResize);
+    };
+  }, [open, updatePopoverRect]);
 
   function fetchSuggestions(q: string) {
     if (debounceRef.current) window.clearTimeout(debounceRef.current);
@@ -108,6 +170,12 @@ export default function AddressAutocomplete({
         lng: det.lng,
         label: det.formattedAddress || s.full,
         placeId: det.placeId,
+        street: det.street ?? "",
+        number: det.number ?? "",
+        neighborhood: det.neighborhood ?? "",
+        cep: det.cep ?? "",
+        city: det.city ?? "",
+        state: det.state ?? "",
       };
       setPicked(resolved);
       setQuery(resolved.label);
@@ -148,10 +216,13 @@ export default function AddressAutocomplete({
   const padY = compact ? "py-1.5" : "py-2";
   const fontSize = compact ? "text-[12px]" : "text-[13px]";
 
+  const Icon = icon === "pin" ? MapPin : Search;
+  const borderless = chrome === "borderless";
+
   return (
     <div ref={wrapRef} className="relative">
-      <div className="relative">
-        <Search
+      <div ref={inputWrapRef} className="relative">
+        <Icon
           className={`absolute left-2.5 top-1/2 -translate-y-1/2 ${compact ? "w-3.5 h-3.5" : "w-4 h-4"} pointer-events-none`}
           style={{ color: "var(--text-light)" }}
           aria-hidden
@@ -177,8 +248,10 @@ export default function AddressAutocomplete({
           aria-controls={listId}
           className={`w-full pl-8 pr-8 ${padY} ${fontSize} rounded-md outline-none transition-colors`}
           style={{
-            background: "var(--bg)",
-            border: `1px solid ${picked ? "var(--accent2)" : "var(--card-border)"}`,
+            background: borderless ? "transparent" : "var(--bg)",
+            border: borderless
+              ? "1px solid transparent"
+              : `1px solid ${picked ? "var(--accent2)" : "var(--card-border)"}`,
             color: "var(--text)",
             fontFamily: "inherit",
           }}
@@ -213,62 +286,73 @@ export default function AddressAutocomplete({
         </p>
       )}
 
-      {open && suggestions.length > 0 && (
-        <ul
-          id={listId}
-          role="listbox"
-          className="absolute z-30 left-0 right-0 mt-1 rounded-md max-h-72 overflow-y-auto"
-          style={{
-            background: "var(--bg-paper)",
-            border: "1px solid var(--card-border)",
-            boxShadow: "0 8px 24px rgba(0,0,0,0.10)",
-          }}
-        >
-          {suggestions.map((s, i) => (
-            <li
-              key={s.placeId}
-              role="option"
-              aria-selected={i === highlight}
-              onMouseEnter={() => setHighlight(i)}
-              onMouseDown={(e) => {
-                e.preventDefault();
-                void pick(s);
-              }}
-              className="px-2.5 py-2 cursor-pointer flex items-start gap-2"
-              style={{
-                background:
-                  i === highlight ? "rgba(139,90,43,0.08)" : "transparent",
-                borderBottom:
-                  i < suggestions.length - 1
-                    ? "1px solid var(--card-border)"
-                    : "none",
-              }}
-            >
-              <MapPin
-                className="w-3.5 h-3.5 shrink-0 mt-0.5"
-                style={{ color: "var(--accent)" }}
-                aria-hidden
-              />
-              <div className="min-w-0">
-                <div
-                  className="text-[12.5px] font-semibold truncate"
-                  style={{ color: "var(--text)" }}
-                >
-                  {s.primary}
-                </div>
-                {s.secondary && (
+      {mounted &&
+        open &&
+        suggestions.length > 0 &&
+        popoverRect &&
+        createPortal(
+          <ul
+            ref={popoverRef}
+            id={listId}
+            role="listbox"
+            className="rounded-md max-h-72 overflow-y-auto"
+            style={{
+              position: "fixed",
+              top: popoverRect.top,
+              left: popoverRect.left,
+              width: popoverRect.width,
+              zIndex: 1000,
+              background: "var(--bg-paper)",
+              border: "1px solid var(--card-border)",
+              boxShadow: "0 8px 24px rgba(0,0,0,0.10)",
+            }}
+          >
+            {suggestions.map((s, i) => (
+              <li
+                key={s.placeId}
+                role="option"
+                aria-selected={i === highlight}
+                onMouseEnter={() => setHighlight(i)}
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  void pick(s);
+                }}
+                className="px-2.5 py-2 cursor-pointer flex items-start gap-2"
+                style={{
+                  background:
+                    i === highlight ? "rgba(31,91,58,0.08)" : "transparent",
+                  borderBottom:
+                    i < suggestions.length - 1
+                      ? "1px solid var(--card-border)"
+                      : "none",
+                }}
+              >
+                <MapPin
+                  className="w-3.5 h-3.5 shrink-0 mt-0.5"
+                  style={{ color: "var(--accent)" }}
+                  aria-hidden
+                />
+                <div className="min-w-0">
                   <div
-                    className="text-[10.5px] truncate"
-                    style={{ color: "var(--text-dim)" }}
+                    className="text-[12.5px] font-semibold truncate"
+                    style={{ color: "var(--text)" }}
                   >
-                    {s.secondary}
+                    {s.primary}
                   </div>
-                )}
-              </div>
-            </li>
-          ))}
-        </ul>
-      )}
+                  {s.secondary && (
+                    <div
+                      className="text-[10.5px] truncate"
+                      style={{ color: "var(--text-dim)" }}
+                    >
+                      {s.secondary}
+                    </div>
+                  )}
+                </div>
+              </li>
+            ))}
+          </ul>,
+          document.body
+        )}
     </div>
   );
 }

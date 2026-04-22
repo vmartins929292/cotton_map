@@ -31,6 +31,12 @@ type ParsedOrigin = {
   short: string;
   color: string;
   address: string;
+  street: string;
+  number: string;
+  neighborhood: string;
+  cep: string;
+  city: string;
+  state: string;
   lat: number;
   lng: number;
   sortOrder: number;
@@ -40,17 +46,28 @@ function parseForm(formData: FormData): ParsedOrigin {
   const get = (k: string) => String(formData.get(k) ?? "").trim();
   const idRaw = get("id");
   const name = get("name");
-  const short = get("short") || name;
+  const city = get("city");
+  const state = get("state").toUpperCase();
+  // Fallback de short: se admin nao informou, usa o nome do municipio (ou nome formal).
+  const short = get("short") || city || name;
   const keyRaw = get("key");
   const key = keyRaw || slugify(name);
   const colorRaw = get("color") || "#8b5a2b";
   const address = get("address");
+  const street = get("street");
+  const number = get("number");
+  const neighborhood = get("neighborhood");
+  const cep = get("cep");
   const lat = Number(get("lat"));
   const lng = Number(get("lng"));
   const sortRaw = get("sort_order");
   const sortOrder = sortRaw ? Number(sortRaw) : 100;
 
   if (!name) throw new Error("Nome obrigatorio.");
+  if (!city) throw new Error("Cidade/municipio obrigatorio.");
+  if (!state || state.length !== 2) {
+    throw new Error("Estado (UF de 2 letras) obrigatorio.");
+  }
   if (!key) throw new Error("Slug (key) invalido.");
   if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
     throw new Error("lat/lng invalidos. Use o autocomplete para localizar o endereco.");
@@ -66,6 +83,12 @@ function parseForm(formData: FormData): ParsedOrigin {
     short,
     color: colorRaw,
     address,
+    street,
+    number,
+    neighborhood,
+    cep,
+    city,
+    state,
     lat,
     lng,
     sortOrder,
@@ -96,6 +119,12 @@ export async function saveOriginAction(
         short: parsed.short,
         color: parsed.color,
         address: parsed.address,
+        street: parsed.street,
+        number: parsed.number,
+        neighborhood: parsed.neighborhood,
+        cep: parsed.cep,
+        city: parsed.city,
+        state: parsed.state,
         lat: parsed.lat,
         lng: parsed.lng,
         sortOrder: parsed.sortOrder,
@@ -113,6 +142,12 @@ export async function saveOriginAction(
         short: parsed.short,
         color: parsed.color,
         address: parsed.address,
+        street: parsed.street,
+        number: parsed.number,
+        neighborhood: parsed.neighborhood,
+        cep: parsed.cep,
+        city: parsed.city,
+        state: parsed.state,
         lat: parsed.lat,
         lng: parsed.lng,
         sortOrder: parsed.sortOrder,
