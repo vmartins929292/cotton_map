@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "seed": "tsx scripts/seed-companies.ts"
+    "seed": "tsx scripts/seed-companies.ts",
+    "enrich:cep": "tsx scripts/enrich-cep.ts"
   },
   "dependencies": {
     "@supabase/ssr": "^0.10.2",
