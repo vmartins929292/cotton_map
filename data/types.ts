@@ -93,10 +93,30 @@ export const KIND_ICONS: Record<InteractionKind, string> = {
   amostra: "📦",
 };
 
+// Abreviacoes consagradas para municipios com nomes muito longos.
+// Aplicadas em TODA a UI via originShortLabel (chips, popups, dialog, etc.)
+// para evitar quebras de layout e melhorar leitura.
+const CITY_ABBREVIATIONS: Record<string, string> = {
+  "luis eduardo magalhaes": "LEM",
+};
+
+function normalizeCityKey(s: string): string {
+  return s
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim();
+}
+
+function abbreviateCity(city: string): string {
+  return CITY_ABBREVIATIONS[normalizeCityKey(city)] ?? city;
+}
+
 /**
  * Label curto da origem usado nos chips da main page no formato `cidade/UF`.
  * Faz fallback para `short` (legacy) ou `name` quando city/state nao estao
- * preenchidos (ex.: bancos antigos antes da migracao).
+ * preenchidos (ex.: bancos antigos antes da migracao). Aplica abreviacoes
+ * para municipios com nome longo (ex.: "Luis Eduardo Magalhaes" -> "LEM").
  */
 export function originShortLabel(o: {
   city?: string;
@@ -104,9 +124,10 @@ export function originShortLabel(o: {
   short?: string;
   name?: string;
 }): string {
-  if (o.city && o.state) return `${o.city}/${o.state}`;
-  if (o.city) return o.city;
-  return o.short || o.name || "";
+  if (o.city && o.state) return `${abbreviateCity(o.city)}/${o.state}`;
+  if (o.city) return abbreviateCity(o.city);
+  const fallback = o.short || o.name || "";
+  return fallback ? abbreviateCity(fallback) : "";
 }
 
 export interface Origin {
