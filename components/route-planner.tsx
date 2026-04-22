@@ -4,6 +4,7 @@ import { useEffect, useId, useRef, useState, useTransition } from "react";
 import {
   AlertTriangle,
   ArrowRight,
+  Building2,
   Check,
   MapPin,
   Plus,
@@ -23,6 +24,10 @@ import { formatDuration } from "@/lib/format";
 
 type OriginChoice =
   | { kind: "fixed"; id: string }
+  | { kind: "custom"; addr: ResolvedAddress | null };
+
+type DestinationChoice =
+  | { kind: "company" }
   | { kind: "custom"; addr: ResolvedAddress | null };
 
 interface Props {
@@ -51,6 +56,9 @@ export default function RoutePlanner({
     kind: "fixed",
     id: origins[0]?.id ?? "",
   }));
+  const [destination, setDestination] = useState<DestinationChoice>({
+    kind: "company",
+  });
   const [waypoints, setWaypoints] = useState<Array<ResolvedAddress | null>>([]);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -71,6 +79,9 @@ export default function RoutePlanner({
     if (!open) return;
     const newId = selectedCompany?.id ?? null;
     if (newId && newId !== prevSelectedId.current) {
+      // Clicar num card sempre prioriza modo "empresa" no destino,
+      // mesmo que o usuario tenha escolhido "Outro" antes.
+      setDestination({ kind: "company" });
       setJustAdded(true);
       const t = window.setTimeout(() => setJustAdded(false), 1500);
       prevSelectedId.current = newId;
@@ -111,10 +122,6 @@ export default function RoutePlanner({
 
   function tracar() {
     setError(null);
-    if (!selectedCompany) {
-      setError("Clique numa empresa na lista ao lado para definir o destino.");
-      return;
-    }
 
     let originPayload: { lat: number; lng: number; label: string };
 
@@ -137,6 +144,33 @@ export default function RoutePlanner({
       };
     }
 
+    let destinationPayload: {
+      companyId?: string;
+      lat?: number;
+      lng?: number;
+      label?: string;
+    };
+
+    if (destination.kind === "company") {
+      if (!selectedCompany) {
+        setError(
+          "Clique numa empresa na lista ao lado ou escolha um destino livre."
+        );
+        return;
+      }
+      destinationPayload = { companyId: selectedCompany.id };
+    } else {
+      if (!destination.addr) {
+        setError("Escolha um endereço de destino.");
+        return;
+      }
+      destinationPayload = {
+        lat: destination.addr.lat,
+        lng: destination.addr.lng,
+        label: destination.addr.label,
+      };
+    }
+
     const wptPayload = waypoints
       .filter((w): w is ResolvedAddress => w !== null)
       .map((w) => ({ lat: w.lat, lng: w.lng, label: w.label }));
@@ -151,7 +185,7 @@ export default function RoutePlanner({
     startTransition(async () => {
       const res = await getCustomRouteAction({
         origin: originPayload,
-        destination: { companyId: selectedCompany.id },
+        destination: destinationPayload,
         waypoints: wptPayload,
         withAlternatives: true,
       });
@@ -243,70 +277,114 @@ export default function RoutePlanner({
           />
 
           <FieldRow label="Destino" labelId={destLabelId} grow>
-            {selectedCompany ? (
-              <div
-                className="h-8 flex items-center gap-2 px-2.5 rounded-md transition-colors min-w-0 w-full"
-                style={{
-                  background: justAdded ? "rgba(45,122,62,0.10)" : "white",
-                  border: `1px solid ${
-                    justAdded ? "#2d7a3e" : "var(--accent2)"
-                  }`,
-                }}
-                aria-labelledby={destLabelId}
-              >
-                <MapPin
-                  className="w-3.5 h-3.5 shrink-0"
+            <DestinationSegmented
+              destination={destination}
+              onPickCompany={() => {
+                setDestination({ kind: "company" });
+                setError(null);
+              }}
+              onPickCustom={() => {
+                setDestination({ kind: "custom", addr: null });
+                setError(null);
+              }}
+            />
+            {destination.kind === "company" ? (
+              selectedCompany ? (
+                <div
+                  className="h-8 flex items-center gap-2 px-2.5 rounded-md transition-colors min-w-0 flex-1"
                   style={{
-                    color: justAdded ? "#2d7a3e" : "var(--accent2)",
+                    background: justAdded ? "rgba(45,122,62,0.10)" : "white",
+                    border: `1px solid ${
+                      justAdded ? "#2d7a3e" : "var(--accent2)"
+                    }`,
                   }}
-                  aria-hidden
-                />
-                <div className="min-w-0 flex-1 flex items-baseline gap-1.5">
-                  <span
-                    className="text-[12px] font-semibold truncate leading-none"
-                    style={{ color: "var(--text)" }}
-                  >
-                    {selectedCompany.name}
-                  </span>
-                  <span
-                    className="text-[10.5px] truncate leading-none hidden sm:inline"
-                    style={{ color: "var(--text-dim)" }}
-                  >
-                    · {selectedCompany.city}/{selectedCompany.state}
-                  </span>
-                </div>
-                {justAdded && (
-                  <span
-                    className="flex items-center gap-1 text-[9.5px] font-bold uppercase tracking-wider px-1.5 h-5 rounded-full shrink-0"
-                    style={{ background: "#2d7a3e", color: "white" }}
-                  >
-                    <Check className="w-2.5 h-2.5" />
-                    Adicionada
-                  </span>
-                )}
-                <button
-                  type="button"
-                  onClick={onClearSelection}
-                  className={`p-0.5 rounded hover:bg-black/5 cursor-pointer shrink-0 ${focusRing}`}
-                  style={{ color: "var(--text-light)" }}
-                  title="Remover destino"
+                  aria-labelledby={destLabelId}
                 >
-                  <X className="w-3.5 h-3.5" />
-                </button>
-              </div>
+                  <MapPin
+                    className="w-3.5 h-3.5 shrink-0"
+                    style={{
+                      color: justAdded ? "#2d7a3e" : "var(--accent2)",
+                    }}
+                    aria-hidden
+                  />
+                  <div className="min-w-0 flex-1 flex items-baseline gap-1.5">
+                    <span
+                      className="text-[12px] font-semibold truncate leading-none"
+                      style={{ color: "var(--text)" }}
+                    >
+                      {selectedCompany.name}
+                    </span>
+                    <span
+                      className="text-[10.5px] truncate leading-none hidden sm:inline"
+                      style={{ color: "var(--text-dim)" }}
+                    >
+                      · {selectedCompany.city}/{selectedCompany.state}
+                    </span>
+                  </div>
+                  {justAdded && (
+                    <span
+                      className="flex items-center gap-1 text-[9.5px] font-bold uppercase tracking-wider px-1.5 h-5 rounded-full shrink-0"
+                      style={{ background: "#2d7a3e", color: "white" }}
+                    >
+                      <Check className="w-2.5 h-2.5" />
+                      Adicionada
+                    </span>
+                  )}
+                  <button
+                    type="button"
+                    onClick={onClearSelection}
+                    className={`p-0.5 rounded hover:bg-black/5 cursor-pointer shrink-0 ${focusRing}`}
+                    style={{ color: "var(--text-light)" }}
+                    title="Remover destino"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              ) : (
+                <div
+                  className="h-8 px-2.5 rounded-md text-[12px] flex items-center gap-2 flex-1 min-w-0"
+                  style={{
+                    background: "rgba(255,255,255,0.5)",
+                    border: "1px dashed var(--card-border)",
+                    color: "var(--text-light)",
+                  }}
+                  aria-labelledby={destLabelId}
+                  title="Clique numa empresa na lista para definir o destino"
+                >
+                  <MapPin className="w-3.5 h-3.5 shrink-0" aria-hidden />
+                  <span className="truncate">Selecione uma empresa…</span>
+                </div>
+              )
             ) : (
-              <div
-                className="h-8 px-2.5 rounded-md text-[12px] flex items-center gap-2 w-full"
-                style={{
-                  background: "rgba(255,255,255,0.5)",
-                  border: "1px dashed var(--card-border)",
-                  color: "var(--text-light)",
-                }}
-                aria-labelledby={destLabelId}
-                title="Clique numa empresa na lista para definir o destino"
-              >
-                <MapPin className="w-3.5 h-3.5 shrink-0" aria-hidden />
-                <span className="truncate">Selecione uma empresa…</span>
+              <div className="flex-1 min-w-[130px]">
+                {destination.addr ? (
+                  <ResolvedOriginCard
+                    addr={destination.addr}
+                    onClear={() =>
+                      setDestination({ kind: "custom", addr: null })
+                    }
+                  />
+                ) : (
+                  <div
+                    className="h-8 rounded-md flex items-center w-full overflow-hidden"
+                    style={{
+                      background: "rgba(255,255,255,0.5)",
+                      border: "1px dashed var(--card-border)",
+                    }}
+                  >
+                    <AddressAutocomplete
+                      placeholder="Endereço de destino…"
+                      initialLabel=""
+                      autoFocus
+                      compact
+                      icon="pin"
+                      chrome="borderless"
+                      onResolved={(addr) =>
+                        setDestination({ kind: "custom", addr })
+                      }
+                    />
+                  </div>
+                )}
               </div>
             )}
           </FieldRow>
@@ -503,7 +581,7 @@ function FieldRow({
 }) {
   return (
     <div
-      className={`flex items-center gap-1.5 ${grow ? "flex-1 min-w-[220px] max-w-[380px]" : ""}`}
+      className={`flex items-center gap-1.5 ${grow ? "flex-1 min-w-[320px] max-w-[520px]" : ""}`}
     >
       <span
         id={labelId}
@@ -575,6 +653,60 @@ function OriginSegmented({
         style={{
           background: isCustom ? "var(--accent)" : "transparent",
           color: isCustom ? "white" : "var(--text-dim)",
+        }}
+      >
+        <MapPin className="w-3 h-3" />
+        Outro
+      </button>
+    </div>
+  );
+}
+
+function DestinationSegmented({
+  destination,
+  onPickCompany,
+  onPickCustom,
+}: {
+  destination: DestinationChoice;
+  onPickCompany: () => void;
+  onPickCustom: () => void;
+}) {
+  const isCompany = destination.kind === "company";
+  return (
+    <div
+      className="inline-flex items-stretch h-8 p-0.5 rounded-md shrink-0 gap-0.5"
+      style={{
+        background: "white",
+        border: "1px solid var(--card-border)",
+      }}
+      role="radiogroup"
+      aria-label="Tipo de destino"
+    >
+      <button
+        type="button"
+        role="radio"
+        aria-checked={isCompany}
+        onClick={onPickCompany}
+        title="Selecionar uma empresa cadastrada"
+        className={`inline-flex items-center justify-center gap-1 px-2.5 rounded text-[11px] font-semibold leading-none transition cursor-pointer ${focusRing}`}
+        style={{
+          background: isCompany ? "var(--accent2)" : "transparent",
+          color: isCompany ? "white" : "var(--text-dim)",
+        }}
+      >
+        <Building2 className="w-3 h-3" />
+        Empresa
+      </button>
+      <button
+        type="button"
+        role="radio"
+        aria-checked={!isCompany}
+        onClick={onPickCustom}
+        title="Usar um endereço personalizado"
+        className={`inline-flex items-center justify-center gap-1 px-2.5 rounded text-[11px] font-semibold leading-none transition cursor-pointer ${focusRing}`}
+        style={{
+          background: !isCompany ? "var(--accent)" : "transparent",
+          color: !isCompany ? "white" : "var(--text-dim)",
         }}
       >
         <MapPin className="w-3 h-3" />
